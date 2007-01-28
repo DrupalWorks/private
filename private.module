@@ -182,8 +182,30 @@ function private_nodeapi(&$node, $op, $arg = 0) {
       db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
       break;
     case 'update':
-      db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
+      $already_exists = db_result(db_query('SELECT 1 FROM {private} WHERE nid = %d', $node->nid));
+      if ($already_exists) {
+        db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
+      }
+      elseif ($node->private) {
+        db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
+      }
       break;
+  }
+}
+
+/**
+* Implementation of hook_file_download().
+*/
+function private_file_download($file) {
+  $file = file_create_path($file);
+  $result = db_query("SELECT f.* FROM {files} f WHERE filepath = '%s'", $file);
+  if ($file = db_fetch_object($result)) {
+    $node = node_load($file->nid);
+    if ($node->private == 1) {
+        if (node_access('view', $node) == FALSE) {
+            return -1;
+        }
+      }
   }
 }
 
