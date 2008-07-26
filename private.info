@@ -1,3 +1,4 @@
 ; $Id$
 name = Private
 description = Allows users to mark content as private, and hide that content from visitors.
+core = 6.x
