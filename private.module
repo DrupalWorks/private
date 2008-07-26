@@ -67,14 +67,14 @@ function private_perm() {
  */
 function private_node_grants($account, $op) {
   if ($op == 'view' && user_access('access private content', $account)) {
-    $grants['example'] = array(1);
+    $grants['private'] = array(1);
   }
 
   if (($op == 'update' || $op == 'delete') && user_access('edit private content', $account)) {
-    $grants['example'] = array(1);
+    $grants['private'] = array(1);
   }
 
-  $grants['example_author'] = array($account->uid);
+  $grants['private_author'] = array($account->uid);
   return $grants;
 }
 
@@ -97,7 +97,7 @@ function private_node_access_records($node) {
   if ($node->private) {
     $grants = array();
     $grants[] = array(
-      'realm' => 'example', 
+      'realm' => 'private', 
       'gid' => TRUE, 
       'grant_view' => TRUE, 
       'grant_update' => FALSE, 
@@ -108,7 +108,7 @@ function private_node_access_records($node) {
     // For the example_author array, the GID is equivalent to a UID, which
     // means there are many many groups of just 1 user. 
     $grants[] = array(
-      'realm' => 'example_author', 
+      'realm' => 'private_author', 
       'gid' => $node->uid, 
       'grant_view' => TRUE, 
       'grant_update' => TRUE, 
@@ -139,7 +139,7 @@ function private_form_alter(&$form, $form_state, $form_id) {
     }
     else {
       $form['private'] = array(
-        '#type' => 'hidden',
+        '#type' => 'value',
         '#value' => $form['#node']->private,
       );
     }
