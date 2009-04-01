@@ -7,7 +7,10 @@
  * individual nodes as private; users with 'access private content' perms can
  * read these nodes, while others cannot.
  */
-
+ 
+define('PRIVATE_DISABLED', 0);
+define('PRIVATE_ALLOWED', 1);
+define('PRIVSTE_AUTOMATIC', 2);
 
 /**
  * Implementation of hook_enable().
@@ -16,6 +19,7 @@
  * when it is enabled to ensure that things are set up.
  */
 function private_enable() {
+  db_query("INSERT INTO {private} (nid, private) SELECT n.nid, 0 FROM {node} n");
   node_access_rebuild(TRUE);
 }
 
@@ -128,24 +132,47 @@ function private_node_access_records($node) {
  */
 function private_form_alter(&$form, $form_state, $form_id) {
   if ($form['#id'] == 'node-form') {
-    if (user_access('mark content as private')) {
-      $form['private'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Private'),
-        '#return_value' => 1,
-        '#description' => t('Check here if this content should be set private and only shown to authorized users.'),
-        '#default_value' => $form['#node']->private,
-      );
-    }
-    else {
-      $form['private'] = array(
-        '#type' => 'value',
-        '#value' => $form['#node']->private,
-      );
+    $node = $form['#node'];
+    $default = variable_get($node->type .'_private', PRIVATE_ALLOWED);
+
+    if ($default != PRIVATE_DISABLED || !empty($node->privacy)) {
+      if (empty($node->nid)) {
+        $privacy = ($default == PRIVATE_DEFAULT);
+      }
+      else {
+        $privacy = $node->private;
+      }
+    
+      if (user_access('mark content as private')) {
+        $form['private'] = array(
+          '#type' => 'checkbox',
+          '#title' => t('Make this post private'),
+          '#return_value' => 1,
+          '#description' => t('When checked, only users with proper access permissions will be able to see this post.'),
+          '#default_value' => $privacy,
+        );
+      }
+      else {
+        $form['private'] = array(
+          '#type' => 'value',
+          '#value' => $privacy,
+        );
+      }
     }
   }
   elseif($form_id == 'node_type_form') {
-    
+    $node_type = (array)$form['#node_type'];
+    $type = $node_type['type'];
+    $form['workflow']['private'] = array(
+      '#type' => 'radios',
+      '#title' => t('Privacy'),
+      '#options' => array(
+        PRIVATE_DISABLED => t('Disabled (always public)'),
+        PRIVATE_ALLOWED => t('Enabled (public by default)'),
+        PRIVATE_AUTOMATIC => t('Enabled (private by default)'),
+      ),
+      '#default_value' => variable_get($type .'_private', PRIVATE_ALLOWED),
+    );
   }
 }
 
@@ -206,4 +233,45 @@ function private_theme() {
 
 function theme_private_node_link($node) {
   return theme('image', drupal_get_path('module', 'private') . '/icon_key.gif', t('Private'), t('This content is private'));
+}
+
+/**
+ * Implementation of hook_node_operations().
+ */
+function private_node_operations() {
+  $operations = array(
+    'private_mark_as_private' => array(
+      'label' => t('Mark as private'),
+      'callback' => 'private_node_mark_private',
+    ),
+    'private_mark_as_public' => array(
+      'label' => t('Mark as public'),
+      'callback' => 'private_node_mark_public',
+    ),
+  );
+  return $operations;
+}
+
+/**
+ * Callback for 'Mark as private' node operation
+ */
+function private_node_mark_private($nids) {
+  foreach ($nids as $nid) {
+    db_query('UPDATE {private} SET private = %d WHERE nid = %d', 1, $nid);
+    if (!db_affected_rows()) {
+      db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $nid, 1);
+    }
+  }
+}
+
+/**
+ * Callback for 'Mark as public' node operation
+ */
+function private_node_mark_public($nids) {
+  foreach ($nids as $nid) {
+    db_query('UPDATE {private} SET private = %d WHERE nid = %d', 0, $nid);
+    if (!db_affected_rows()) {
+      db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $nid, 0);
+    }
+  }
 }
