@@ -275,3 +275,13 @@ function private_node_mark_public($nids) {
     }
   }
 }
+
+/**
+ * Tell Views that we're down with it, yo.
+ */
+function private_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'private'),
+  );
+}
