@@ -144,6 +144,9 @@ function private_form_alter(&$form, $form_state, $form_id) {
       );
     }
   }
+  elseif($form_id == 'node_type_form') {
+    
+  }
 }
 
 /**
@@ -165,11 +168,8 @@ function private_nodeapi(&$node, $op, $arg = 0) {
       db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
       break;
     case 'update':
-      $already_exists = db_result(db_query('SELECT 1 FROM {private} WHERE nid = %d', $node->nid));
-      if ($already_exists) {
-        db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
-      }
-      elseif ($node->private) {
+      db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
+      if (!db_affected_rows()) {
         db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
       }
       break;
