@@ -7,10 +7,10 @@
  * individual nodes as private; users with 'access private content' perms can
  * read these nodes, while others cannot.
  */
- 
+
 define('PRIVATE_DISABLED', 0);
 define('PRIVATE_ALLOWED', 1);
-define('PRIVSTE_AUTOMATIC', 2);
+define('PRIVATE_AUTOMATIC', 2);
 
 /**
  * Implementation of hook_enable().
@@ -100,21 +100,21 @@ function private_node_access_records($node) {
   if ($node->private) {
     $grants = array();
     $grants[] = array(
-      'realm' => 'private', 
-      'gid' => TRUE, 
-      'grant_view' => TRUE, 
-      'grant_update' => FALSE, 
+      'realm' => 'private',
+      'gid' => TRUE,
+      'grant_view' => TRUE,
+      'grant_update' => FALSE,
       'grant_delete' => FALSE,
       'priority' => 0,
     );
 
     // For the example_author array, the GID is equivalent to a UID, which
-    // means there are many many groups of just 1 user. 
+    // means there are many many groups of just 1 user.
     $grants[] = array(
-      'realm' => 'private_author', 
-      'gid' => $node->uid, 
-      'grant_view' => TRUE, 
-      'grant_update' => TRUE, 
+      'realm' => 'private_author',
+      'gid' => $node->uid,
+      'grant_view' => TRUE,
+      'grant_update' => TRUE,
       'grant_delete' => TRUE,
       'priority' => 0,
     );
@@ -126,22 +126,22 @@ function private_node_access_records($node) {
  * Implementation of hook_form_alter()
  *
  * This module adds a simple checkbox to the node form labeled private. If the
- * checkbox is labelled, only the node author and users with 'access private content' 
- * privileges may see it. 
+ * checkbox is labelled, only the node author and users with 'access private content'
+ * privileges may see it.
  */
 function private_form_alter(&$form, $form_state, $form_id) {
   if ($form['#id'] == 'node-form') {
     $node = $form['#node'];
-    $default = variable_get($node->type .'_private', PRIVATE_ALLOWED);
+    $default = variable_get('private_'. $node->type, PRIVATE_ALLOWED);
 
     if ($default != PRIVATE_DISABLED || !empty($node->privacy)) {
       if (empty($node->nid)) {
-        $privacy = ($default == PRIVATE_DEFAULT);
+        $privacy = ($default == PRIVATE_AUTOMATIC);
       }
       else {
         $privacy = $node->private;
       }
-    
+
       if (user_access('mark content as private')) {
         $form['private'] = array(
           '#type' => 'checkbox',
@@ -170,7 +170,7 @@ function private_form_alter(&$form, $form_state, $form_id) {
         PRIVATE_ALLOWED => t('Enabled (public by default)'),
         PRIVATE_AUTOMATIC => t('Enabled (private by default)'),
       ),
-      '#default_value' => variable_get($type .'_private', PRIVATE_ALLOWED),
+      '#default_value' => variable_get('private_'. $type, PRIVATE_ALLOWED),
     );
   }
 }
