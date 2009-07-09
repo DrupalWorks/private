@@ -11,6 +11,7 @@
 define('PRIVATE_DISABLED', 0);
 define('PRIVATE_ALLOWED', 1);
 define('PRIVATE_AUTOMATIC', 2);
+define('PRIVATE_ALWAYS', 3);
 
 /**
  * Implementation of hook_enable().
@@ -136,13 +137,13 @@ function private_form_alter(&$form, $form_state, $form_id) {
 
     if ($default != PRIVATE_DISABLED || !empty($node->privacy)) {
       if (empty($node->nid)) {
-        $privacy = ($default == PRIVATE_AUTOMATIC);
+        $privacy = ($default > PRIVATE_ALLOWED);
       }
       else {
         $privacy = $node->private;
       }
 
-      if (user_access('mark content as private')) {
+      if (user_access('mark content as private') && $default != PRIVATE_ALWAYS) {
         $form['private'] = array(
           '#type' => 'checkbox',
           '#title' => t('Make this post private'),
@@ -169,6 +170,7 @@ function private_form_alter(&$form, $form_state, $form_id) {
         PRIVATE_DISABLED => t('Disabled (always public)'),
         PRIVATE_ALLOWED => t('Enabled (public by default)'),
         PRIVATE_AUTOMATIC => t('Enabled (private by default)'),
+        PRIVATE_ALWAYS => t('Hidden (always private)'),
       ),
       '#default_value' => variable_get('private_'. $type, PRIVATE_ALLOWED),
     );
