@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 function private_schema() {
   $schema['private'] = array(
