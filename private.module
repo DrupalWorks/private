@@ -256,7 +256,7 @@ function private_node_view($node, $view_mode) {
     $links['private_icon']['title'] = theme('private_node_link');
     $links['private_icon']['html'] = TRUE;
     $node->content['links']['private'] = array(
-      '#theme' => 'links__node__private'
+      '#theme' => 'links__node__private',
       '#links' => $links,
       '#attributes' => array('class' => array('links', 'inline')),
     );
@@ -280,7 +280,7 @@ function private_theme() {
  */
 function theme_private_node_link() {
   $vars = array(
-    'path' => drupal_get_path('module', 'private') . '/icon_key.gif', =
+    'path' => drupal_get_path('module', 'private') . '/icon_key.gif',
     'width' => '16',
     'height' => '16',
     'alt' => t('Private'),
