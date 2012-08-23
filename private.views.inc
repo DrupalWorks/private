@@ -1,9 +1,17 @@
 <?php
 
+/**
+ * @file
+ * Views integration functions for the private module.
+ */
+
+/**
+ * Implements hook_views_data().
+ */
 function private_views_data() {
   $data = array();
 
-  $data['private']['table']['group'] = t('Node');
+  $data['private']['table']['group'] = t('Content');
 
   $data['private']['table']['join'] = array(
     'node' => array(
@@ -34,6 +42,9 @@ function private_views_data() {
 
 }
 
+/**
+ * Implements hook_views_handlers().
+ */
 function private_views_handlers() {
   return array(
     'info' => array(

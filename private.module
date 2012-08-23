@@ -11,26 +11,27 @@ define('PRIVATE_DISABLED', 0);
 define('PRIVATE_ALLOWED', 1);
 define('PRIVATE_AUTOMATIC', 2);
 define('PRIVATE_ALWAYS', 3);
+define('PRIVATE_GRANT_ALL', 1);
 
 /**
- * Implementation of hook_enable().
+ * Implements hook_enable().
  *
  * A node access module needs to force a rebuild of the node access table
  * when it is enabled to ensure that things are set up.
  */
 function private_enable() {
-  node_access_rebuild(TRUE);
+  node_access_needs_rebuild(TRUE);
 }
 
 /**
- * Implementation of hook_disable().
+ * Implements hook_disable().
  *
  * A node access module needs to force a rebuild of the node access table
  * when it is disabled to ensure that its entries are removed from the table.
  */
 function private_disable() {
   private_disabling(TRUE);
-  node_access_rebuild(TRUE);
+  node_access_needs_rebuild(TRUE);
 }
 
 /**
@@ -42,21 +43,35 @@ function private_disabling($set = NULL) {
   if ($set !== NULL) {
     $disabling = $set;
   }
+
   return $disabling;
 }
 
 /**
- * Implementation of hook_perm().
+ * Implements hook_permission().
  *
  * In this example, we will use a simple permission to determine whether a user
  * has access to "private" content. This permission is defined here.
  */
-function private_perm() {
-  return array('mark content as private', 'access private content', 'edit private content');
+function private_permission() {
+  return array(
+    'mark content as private' => array(
+      'title' => t('Mark content as private'),
+      'description' => t('Make content only viewable by people with access to view private content'),
+    ),
+    'access private content' => array(
+      'title' => t('Access private content'),
+      'description' => t('Access any content marked as private'),
+    ),
+    'edit private content' => array(
+      'title' => t('Edit private content'),
+      'description' => t('Edit content marked as private'),
+    ),
+  );
 }
 
 /**
- * Implementation of hook_node_grants().
+ * Implements hook_node_grants().
  *
  * Tell the node access system what GIDs the user belongs to for each realm.
  * In this example, we are providing two realms: the example realm, which
@@ -69,26 +84,26 @@ function private_perm() {
  *
  */
 function private_node_grants($account, $op) {
+  // First grant a grant to the author for own content.
+  $grants['private_author'] = array($account->uid);
+
   if ($op == 'view' && user_access('access private content', $account)) {
-    $grants['private'] = array(1);
+    $grants['private_view'] = array(PRIVATE_GRANT_ALL);
   }
 
   if (($op == 'update' || $op == 'delete') && user_access('edit private content', $account)) {
-    $grants['private'] = array(1);
+    $grants['private_edit'] = array(PRIVATE_GRANT_ALL);
   }
 
-  $grants['private_author'] = array($account->uid);
   return $grants;
 }
 
 /**
- * Implementation of hook_node_access_records().
+ * Implements hook_node_access_records().
  *
  * All node access modules must implement this hook. If the module is
  * interested in the privacy of the node passed in, return a list
- * of node access values for each grant ID we offer. Since this
- * example module only offers 1 grant ID, we will only ever be
- * returning one record.
+ * of node access values for each grant ID we offer.
  */
 function private_node_access_records($node) {
   if (private_disabling()) {
@@ -97,57 +112,62 @@ function private_node_access_records($node) {
 
   // We only care about the node if it's been marked private. If not, it is
   // treated just like any other node and we completely ignore it.
-  if ($node->private) {
+  if (isset($node->private) && $node->private == 1) {
     $grants = array();
     $grants[] = array(
-      'realm' => 'private',
-      'gid' => TRUE,
-      'grant_view' => TRUE,
-      'grant_update' => FALSE,
-      'grant_delete' => FALSE,
+      'realm' => 'private_view',
+      'gid' => PRIVATE_GRANT_ALL,
+      'grant_view' => 1,
+      'grant_update' => 0,
+      'grant_delete' => 0,
       'priority' => 0,
     );
-
-    // For the example_author array, the GID is equivalent to a UID, which
-    // means there are many many groups of just 1 user.
+    $grants[] = array(
+      'realm' => 'private_edit',
+      'gid' => PRIVATE_GRANT_ALL,
+      'grant_view' => 1,
+      'grant_update' => 1,
+      'grant_delete' => 1,
+      'priority' => 0,
+    );
     $grants[] = array(
       'realm' => 'private_author',
       'gid' => $node->uid,
-      'grant_view' => TRUE,
-      'grant_update' => TRUE,
-      'grant_delete' => TRUE,
+      'grant_view' => 1,
+      'grant_update' => 1,
+      'grant_delete' => 1,
       'priority' => 0,
     );
+
     return $grants;
   }
 }
 
 /**
- * Implementation of hook_form_alter()
+ * Implements hook_form_alter().
  *
  * This module adds a simple checkbox to the node form labeled private. If the
  * checkbox is labelled, only the node author and users with 'access private content'
  * privileges may see it.
  */
-function private_form_alter(&$form, $form_state, $form_id) {
-  if ($form['#id'] == 'node-form') {
+function private_form_alter(&$form, &$form_state, $form_id) {
+  if (!empty($form['#node_edit_form'])) {
     $node = $form['#node'];
-    $default = variable_get('private_'. $node->type, PRIVATE_ALLOWED);
+    $default = variable_get('private_' . $node->type, PRIVATE_ALLOWED);
 
-    if ($default != PRIVATE_DISABLED || !empty($node->privacy)) {
+    if ($default != PRIVATE_DISABLED || !empty($node->private)) {
       if (empty($node->nid)) {
         $privacy = ($default > PRIVATE_ALLOWED);
       }
       else {
-        $privacy = $node->private;
+        $privacy = isset($node->private) ? $node->private : 0;
       }
 
       if (user_access('mark content as private') && $default != PRIVATE_ALWAYS) {
-        $form['private'] = array(
+        $form['options']['private'] = array(
           '#type' => 'checkbox',
           '#title' => t('Make this post private'),
-          '#return_value' => 1,
-          '#description' => t('When checked, only users with proper access permissions will be able to see this post.'),
+          '#attributes' => array('title' => t('When checked, only users with proper access permissions will be able to see this post.')),
           '#default_value' => $privacy,
         );
       }
@@ -159,9 +179,13 @@ function private_form_alter(&$form, $form_state, $form_id) {
       }
     }
   }
-  elseif($form_id == 'node_type_form') {
-    $node_type = (array)$form['#node_type'];
-    $type = $node_type['type'];
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function private_form_node_type_form_alter(&$form, &$form_state, $form_id) {
+  if (isset($form['type'])) {
     $form['workflow']['private'] = array(
       '#type' => 'radios',
       '#title' => t('Privacy'),
@@ -171,87 +195,121 @@ function private_form_alter(&$form, $form_state, $form_id) {
         PRIVATE_AUTOMATIC => t('Enabled (private by default)'),
         PRIVATE_ALWAYS => t('Hidden (always private)'),
       ),
-      '#default_value' => variable_get('private_'. $type, PRIVATE_ALLOWED),
+      '#default_value' => variable_get('private_' . $form['#node_type']->type, PRIVATE_ALLOWED),
     );
   }
 }
 
 /**
- * Implementation of hook_nodeapi().
- *
- * - "delete", "insert", and "update":
- * The module must track the access status of the node.
+ * Implements hook_node_load().
  */
-function private_nodeapi(&$node, $op, $arg = 0) {
-  switch ($op) {
-    case 'load':
-      $result = db_fetch_object(db_query('SELECT * FROM {private} WHERE nid = %d', $node->nid));
-      $node->private = $result->private;
-      break;
-    case 'delete':
-      db_query('DELETE FROM {private} WHERE nid = %d', $node->nid);
-      break;
-    case 'insert':
-    case 'update':
-      db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
-      if (!db_affected_rows()) {
-        db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
-      }
-      break;
+function private_node_load($nodes, $types) {
+  $result = db_query('SELECT * FROM {private} WHERE nid IN(:nids)', array(':nids' => array_keys($nodes)));
+  foreach ($result as $record) {
+    $nodes[$record->nid]->private = $record->private;
   }
 }
 
 /**
-* Implementation of hook_file_download().
-*/
-function private_file_download($file) {
-  $file = file_create_path($file);
-  $result = db_query("SELECT f.* FROM {files} f WHERE filepath = '%s'", $file);
-  if ($file = db_fetch_object($result)) {
-    $node = node_load($file->nid);
-    if ($node->private == 1) {
-        if (node_access('view', $node) == FALSE) {
-            return -1;
-        }
-      }
+ * Implements hook_node_delete().
+ */
+function private_node_delete($node) {
+  db_delete('private')
+    ->condition('nid', $node->nid)
+    ->execute();
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function private_node_insert($node) {
+  private_node_update($node);
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function private_node_update($node) {
+  if (isset($node->private)) {
+    db_merge('private')
+      ->key(array('nid' => $node->nid))
+      ->fields(array(
+        'nid' => $node->nid,
+        'private' => (int)$node->private,
+      ))
+      ->execute();
+
+    $vars = array(
+      '@type' => node_type_get_name($node),
+      '%title' => $node->title,
+      '%private' => !empty($node->private) ? t('Yes') : t('No'),
+    );
+    drupal_set_message(t('@type %title has private set to "%private".', $vars));
   }
 }
 
-function private_link($type, $node = NULL, $teaser = FALSE) {
-  if ($type == 'node' && $node->private) {
-    $links['private_icon']['title'] = theme('private_node_link', $node);
+/**
+ * Implements hook_node_view().
+ */
+function private_node_view($node, $view_mode) {
+  if (isset($node->private) && $node->private == 1) {
+    $links['private_icon']['title'] = theme('private_node_link');
     $links['private_icon']['html'] = TRUE;
-    return $links;
+    $node->content['links']['private'] = array(
+      '#theme' => 'links__node__private'
+      '#links' => $links,
+      '#attributes' => array('class' => array('links', 'inline')),
+    );
   }
 }
 
+/**
+ * Implements hook_theme().
+ */
 function private_theme() {
-  return array('private_node_link' => array('arguments' => array('node' => NULL)));
-}
-
-function theme_private_node_link($node) {
-  return theme('image', drupal_get_path('module', 'private') . '/icon_key.gif', t('Private'), t('This content is private'));
+  return array(
+    'private_node_link' => array(
+      'variables' => array(),
+    ),
+  );
 }
 
 /**
- * Implementation of hook_action_info().
+ * Custom theme function
+ * @see private_theme()
+ */
+function theme_private_node_link() {
+  $vars = array(
+    'path' => drupal_get_path('module', 'private') . '/icon_key.gif', =
+    'width' => '16',
+    'height' => '16',
+    'alt' => t('Private'),
+    'title' => t('This content is private.')
+  );
+  return theme('image', $vars);
+}
+
+/**
+ * Implements hook_action_info().
  */
 function private_action_info() {
   return array(
     'private_set_private_action' => array(
       'type' => 'node',
-      'description' => t('Make post private'),
+      'label' => t('Make post private'),
       'configurable' => FALSE,
-      'hooks' => array(
-        'nodeapi' => array('insert', 'update'),
+      'triggers' => array(
+        'node_insert',
+        'node_update',
       ),
     ),
     'private_set_public_action' => array(
       'type' => 'node',
-      'description' => t('Make post public'),
+      'label' => t('Make post public'),
       'configurable' => FALSE,
-      'hooks' => array(
-        'nodeapi' => array('insert', 'update'),
+      'triggers' => array(
+        'node_insert',
+        'node_update',
       ),
     ),
   );
@@ -278,7 +336,7 @@ function private_set_private_action(&$node, $context = array()) {
 }
 
 /**
- * Implementation of hook_node_operations().
+ * Implements hook_node_operations().
  */
 function private_node_operations() {
   $operations = array(
@@ -299,10 +357,13 @@ function private_node_operations() {
  */
 function private_node_mark_private($nids) {
   foreach ($nids as $nid) {
-    db_query('UPDATE {private} SET private = %d WHERE nid = %d', 1, $nid);
-    if (!db_affected_rows()) {
-      db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $nid, 1);
-    }
+    db_merge('private')
+      ->key(array('nid' => $nid))
+      ->fields(array(
+        'nid' => $nid,
+        'private' => 1,
+      ))
+      ->execute();
   }
 }
 
@@ -311,10 +372,13 @@ function private_node_mark_private($nids) {
  */
 function private_node_mark_public($nids) {
   foreach ($nids as $nid) {
-    db_query('UPDATE {private} SET private = %d WHERE nid = %d', 0, $nid);
-    if (!db_affected_rows()) {
-      db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $nid, 0);
-    }
+    db_merge('private')
+      ->key(array('nid' => $nid))
+      ->fields(array(
+        'nid' => $nid,
+        'private' => 0,
+      ))
+      ->execute();
   }
 }
 
