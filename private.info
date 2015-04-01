@@ -1,6 +1,6 @@
 name = Private
 description = Allows users to mark content as private, and hide that content from visitors.
 core = 7.x
-package = Node Access
+package = Access control
 
 files[] = private_handler_filter_private.inc
