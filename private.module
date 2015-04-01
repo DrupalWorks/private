@@ -238,13 +238,6 @@ function private_node_update($node) {
         'private' => (int)$node->private,
       ))
       ->execute();
-
-    $vars = array(
-      '@type' => node_type_get_name($node),
-      '%title' => $node->title,
-      '%private' => !empty($node->private) ? t('Yes') : t('No'),
-    );
-    drupal_set_message(t('@type %title has private set to "%private".', $vars));
   }
 }
 
