@@ -164,12 +164,23 @@ function private_form_alter(&$form, &$form_state, $form_id) {
       }
 
       if (user_access('mark content as private') && $default != PRIVATE_ALWAYS) {
-        $form['options']['private'] = array(
-          '#type' => 'checkbox',
-          '#title' => t('Make this post private'),
-          '#attributes' => array('title' => t('When checked, only users with proper access permissions will be able to see this post.')),
-          '#default_value' => $privacy,
-        );
+        if (user_access('administer nodes')) {
+          $form['options']['private'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Make this post private'),
+            '#attributes' => array('title' => t('When checked, only users with proper access permissions will be able to see this post.')),
+            '#default_value' => $privacy,
+          );
+        }
+        else {
+          $form['private'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Make this post private'),
+            '#attributes' => array('title' => t('When checked, only users with proper access permissions will be able to see this post.')),
+            '#default_value' => $privacy,
+            '#weight' => 99,
+          );
+        }
       }
       else {
         $form['private'] = array(
