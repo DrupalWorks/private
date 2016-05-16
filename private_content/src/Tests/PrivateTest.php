@@ -1,24 +1,29 @@
 <?php
 
-/**
- * @file
- * Tests for private module.
- */
-class PrivateTestCase extends DrupalWebTestCase {
+namespace Drupal\private_content\Tests;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Private functionality',
-      'description' => 'Checks behavior of Private.',
-      'group' => 'Examples',
-    );
-  }
+use Drupal\simpletest\WebTestBase;
+
+/**
+ * Tests the private module.
+ *
+ * @group private
+ */
+class PrivateTest extends WebTestBase {
 
   /**
-   * Enable modules and create user with specific permissions.
+   * Modules to install.
+   *
+   * @var array
+   */
+  public static $modules = array('node', 'search', 'private_content');
+
+  /**
+   * Rebuild node access.
    */
   public function setUp() {
-    parent::setUp('private', 'search');
+    parent::setUp();
+    $this->createContentType(['type' => 'article']);
     node_access_rebuild();
   }
 
@@ -50,37 +55,37 @@ class PrivateTestCase extends DrupalWebTestCase {
     $titles = array(); // Titles keyed by nid
     $private_nodes = array(); // Array of nids marked private.
     for ($i = 0; $i < $num_simple_users; $i++) {
-      $simple_users[$i] = $this->drupalCreateUser(array('access content', 'create article content', 'search content'));
+      $simple_users[$i] = $this->drupalCreateUser(array('access content', 'create article content', 'search content', 'mark content as private'));
     }
+
     foreach ($simple_users as $web_user) {
       $this->drupalLogin($web_user);
       foreach (array(0 => 'Public', 1 => 'Private') as $is_private => $type) {
         $edit = array(
-          'title' => t('@private_public Article created by @user', array('@private_public' => $type, '@user' => $web_user->name)),
+          'title[0][value]' => "$type Article created by " . $web_user->name->value,
         );
         if ($is_private) {
           $edit['private'] = TRUE;
-          $edit['body[und][0][value]'] = 'private node';
+          $edit['body[0][value]'] = 'private node';
         }
         else {
-          $edit['body[und][0][value]'] = 'public node';
+          $edit['body[0][value]'] = 'public node';
         }
-        $this->drupalPost('node/add/article', $edit, t('Save'));
-        debug(t('Created article with private=@private', array('@private' => $is_private)));
-        $this->assertText(t('Article @title has been created', array('@title' => $edit['title'])));
-        $nid = db_query('SELECT nid FROM {node} WHERE title = :title', array(':title' => $edit['title']))->fetchField();
-        $this->assertText(t('New node @nid was created and private=@private', array('@nid' => $nid, '@private' => $is_private)));
-        $private_status = db_query('SELECT private FROM {private} where nid = :nid', array(':nid' => $nid))->fetchField();
-        $this->assertTrue($is_private == $private_status, t('Node was properly set to private or not private in private table.'));
+        $this->drupalPostForm('node/add/article', $edit, 'Save');
+        $nid = db_query('SELECT nid FROM {node_field_data} WHERE title = :title', array(':title' => $edit['title[0][value]']))->fetchField();
+        debug($nid, 'getting nid');
+        $node = node_load($nid);
+        $this->assertTrue($is_private == $node->private->value, 'Node was properly set to private or not private in private field.');
         if ($is_private) {
           $private_nodes[] = $nid;
         }
-        $titles[$nid] = $edit['title'];
-        $nodes_by_user[$web_user->uid][$nid] = $is_private;
+        $titles[$nid] = $edit['title[0][value]'];
+        $nodes_by_user[$web_user->id()][$nid] = $is_private;
       }
     }
     debug($nodes_by_user);
-    $this->cronRun();  // Build the search index.
+    // Build the search index.
+    $this->cronRun();
     foreach ($simple_users as $web_user) {
       $this->drupalLogin($web_user);
       // Check to see that we find the number of search results expected.
@@ -88,7 +93,7 @@ class PrivateTestCase extends DrupalWebTestCase {
       // Check own nodes to see that all are readable.
       foreach (array_keys($nodes_by_user) as $uid) {
         // All of this user's nodes should be readable to same.
-        if ($uid == $web_user->uid) {
+        if ($uid == $web_user->id()) {
           foreach ($nodes_by_user[$uid] as $nid => $is_private) {
             $this->drupalGet('node/' . $nid);
             $this->assertResponse(200);
@@ -100,20 +105,12 @@ class PrivateTestCase extends DrupalWebTestCase {
           // but we should be able to read non-private nodes.
           foreach ($nodes_by_user[$uid] as $nid => $is_private) {
             $this->drupalGet('node/' . $nid);
-            $this->assertResponse($is_private ? 403 : 200, t('Node @nid by user @uid should get a @response for this user (@web_user_uid)', array('@nid' => $nid, '@uid' => $uid, '@response' => $is_private ? 403 : 200, '@web_user_uid' => $web_user->uid)));
+            $this->assertResponse($is_private ? 403 : 200, "Node $nid by user $uid should get a " . ($is_private ? 403 : 200) . "for this user (" . $web_user->id() . ")");
             if (!$is_private) {
               $this->assertTitle($titles[$nid] . ' | Drupal', t('Correct title for node was found'));
             }
           }
         }
-      }
-
-      // Check to see that the correct nodes are shown on examples/node_access.
-      $this->drupalGet('examples/node_access');
-      $accessible = $this->xpath("//tr[contains(@class,'accessible')]");
-      $this->assertEqual(count($accessible), 1, t('One private item accessible'));
-      foreach ($accessible as $row) {
-        $this->assertEqual($row->td[2], $web_user->uid, t('Accessible row owned by this user'));
       }
     }
 
@@ -136,28 +133,28 @@ class PrivateTestCase extends DrupalWebTestCase {
     $edit_user = $this->drupalCreateUser(array('access content', 'access private content', 'edit private content'));
     $this->drupalLogin($edit_user);
     foreach ($private_nodes as $nid) {
-      $body = $this->randomName();
-      $edit = array('body[und][0][value]' => $body);
-      $this->drupalPost('node/' . $nid . '/edit', $edit, t('Save'));
-      $this->assertText(t('has been updated'));
-      $this->drupalPost('node/' . $nid . '/edit', array(), t('Delete'));
-      $this->drupalPost(NULL, array(), t('Delete'));
+      $body = $this->randomString(200);
+      $edit = array('body[0][value]' => $body);
+      $this->drupalPostForm('node/' . $nid . '/edit', $edit, 'Save');
+      $this->assertText('has been updated');
+      $this->drupalGet('node/' . $nid . '/delete');
+      $this->drupalPostForm(NULL, array(), 'Delete');
       $this->assertText(t('has been deleted'));
     }
-
 
   }
 
   /**
    * On the search page, search for a string and assert the expected number
    * of results.
+   *
    * @param $search_query
    *   String to search for
    * @param $expected_result_count
    *   Expected result count
    */
   function checkSearchResults($search_query, $expected_result_count) {
-    $this->drupalPost('search/node', array('keys' => $search_query), t('Search'));
+    $this->drupalPostForm('search/node', array('keys' => $search_query), 'Search');
     $search_results = $this->xpath("//ol[contains(@class, 'search-results')]/li");
     $this->assertEqual(count($search_results), $expected_result_count, t('Found the expected number of search results'));
   }

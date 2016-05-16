@@ -150,7 +150,7 @@ function private_content_form_node_form_alter(&$form, &$form_state) {
   $node_type = $node->type->entity;
   $default = $node_type->getThirdPartySetting('private', 'private', PRIVATE_ALLOWED);
 
-  if ($default != PRIVATE_DISABLED || !empty($node->private)) {
+  if ($default != PRIVATE_DISABLED || !empty($node->private->value)) {
     if ($node->isNew()) {
       $privacy = ($default > PRIVATE_ALLOWED);
     }

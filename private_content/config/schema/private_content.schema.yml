@@ -1,0 +1,9 @@
+# Schema for the configuration files of the private module.
+
+action.configuration.node_make_content_public:
+  type: action_configuration_default
+  label: 'Make content public configuration'
+
+action.configuration.node_make_content_private:
+  type: action_configuration_default
+  label: 'Make content private configuration'
