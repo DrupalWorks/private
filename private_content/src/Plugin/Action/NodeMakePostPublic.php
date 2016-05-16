@@ -6,21 +6,21 @@ use Drupal\Core\Action\ActionBase;
 use Drupal\Core\Session\AccountInterface;
 
 /**
- * Publishes a node.
+ * Make a post public.
  *
  * @Action(
- *   id = "node_publish_action",
- *   label = @Translation("Publish selected content"),
+ *   id = "node_make_content_public",
+ *   label = @Translation("Make content public"),
  *   type = "node"
  * )
  */
-class MakeNodePrivate extends ActionBase {
+class NodeMakePostPublic extends ActionBase {
 
   /**
    * {@inheritdoc}
    */
   public function execute($entity = NULL) {
-    $entity->private->value = 1;
+    $entity->private->value = 0;
     $entity->save();
   }
 

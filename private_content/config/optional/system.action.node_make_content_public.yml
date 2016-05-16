@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+id: node_make_content_public
+label: 'Make content public'
+type: node
+plugin: node_make_content_public
+configuration: {  }

@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+id: node_make_content_private
+label: 'Make content private'
+type: node
+plugin: node_make_content_private
+configuration: {  }
