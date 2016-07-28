@@ -148,7 +148,7 @@ function private_content_form_node_form_alter(&$form, &$form_state) {
   $node = $form_state->getFormObject()->getEntity();
   /** @var \Drupal\node\NodeTypeInterface $node_type */
   $node_type = $node->type->entity;
-  $default = $node_type->getThirdPartySetting('private', 'private', PRIVATE_ALLOWED);
+  $default = $node_type->getThirdPartySetting('private_content', 'private', PRIVATE_ALLOWED);
 
   if ($default != PRIVATE_DISABLED || !empty($node->private->value)) {
     if ($node->isNew()) {
@@ -202,7 +202,7 @@ function private_content_form_node_type_form_alter(&$form, FormStateInterface $f
       PRIVATE_AUTOMATIC => t('Enabled (private by default)'),
       PRIVATE_ALWAYS => t('Hidden (always private)'),
     ),
-    '#default_value' => $type->getThirdPartySetting('private', 'private', PRIVATE_ALLOWED),
+    '#default_value' => $type->getThirdPartySetting('private_content', 'private', PRIVATE_ALLOWED),
   );
 
   $form['#entity_builders'][] = 'private_content_form_node_type_form_builder';
@@ -214,5 +214,5 @@ function private_content_form_node_type_form_alter(&$form, FormStateInterface $f
  * @see private_content_form_node_type_form_alter()
  */
 function private_content_form_node_type_form_builder($entity_type, NodeTypeInterface $type, &$form, FormStateInterface $form_state) {
-  $type->setThirdPartySetting('private', 'private', $form_state->getValue('private'));
+  $type->setThirdPartySetting('private_content', 'private', $form_state->getValue('private'));
 }
