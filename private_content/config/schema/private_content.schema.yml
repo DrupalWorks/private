@@ -13,5 +13,5 @@ node.type.*.third_party.private_content:
   label: 'Per-content type private settings'
   mapping:
     private:
-      type: boolean
+      type: integer
       label: 'Private visibility on the form'
